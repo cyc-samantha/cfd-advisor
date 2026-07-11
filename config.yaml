@@ -1,0 +1,39 @@
+# Index CFD Trade Advisor — default configuration (SPEC §2).
+# All values overridable here; the app reads this file at startup.
+
+# Instruments analysed. Each target maps an ETF proxy (free yfinance data)
+# to the Trading212 CFD symbol the user actually trades.
+targets:
+  - symbol: SPY          # ETF proxy analysed
+    cfd_symbol: US500    # Trading212 CFD instrument
+    name: "S&P 500"
+  - symbol: QQQ
+    cfd_symbol: US100
+    name: "Nasdaq-100"
+  - symbol: GLD
+    cfd_symbol: Gold
+    name: "Gold"
+  - symbol: SLV
+    cfd_symbol: Silver
+    name: "Silver"
+
+# Risk-first sizing (SPEC §2 A4). Position size is derived from the stop
+# distance so a stopped-out trade loses risk_pct of capital.
+risk_pct: 0.01              # default 1% of capital risked per trade
+risk_pct_min: 0.0025       # allowed range lower bound (0.25%)
+risk_pct_max: 0.02         # allowed range upper bound (2%)
+
+# Take-profit as a multiple of the stop distance (R). SPEC §2 A5.
+tp_r_multiple: 1.5
+
+# Event blackout: no new positions within this many days of a
+# high-impact macro event (SPEC §6).
+blackout_days: 2
+
+# Direction policy. Shorts require stricter confluence (SPEC §2 A3).
+allow_short: true
+
+# Account / exposure limits (SPEC §2 A4).
+capital_default: 10000     # USD, CFD account equity
+max_open_positions: 2
+max_open_risk_pct: 0.02    # max total open risk across all positions

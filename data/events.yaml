@@ -1,0 +1,37 @@
+# Macro event calendar for the blackout / staleness gate (SPEC §6).
+# Manually maintained (~5 min/month). High-impact events only:
+# CPI / FOMC / NFP (+ optional PCE).
+#
+# Rules (SPEC §6):
+#   - No NEW positions within `blackout_days` before a high-impact event.
+#   - Any event inside the expected holding window is shown on the card
+#     with the gap-risk warning.
+#   - A calendar with no FUTURE events must fail loudly ("stale — refresh
+#     before trading"). Keep at least one real upcoming date here.
+#
+# Schema per event:
+#   date:   ISO 8601 (YYYY-MM-DD), the US release date
+#   type:   CPI | FOMC | NFP | PCE
+#   impact: high | medium | low
+#   note:   free-text description
+
+last_updated: 2026-07-11
+
+events:
+  # PLACEHOLDER — user must maintain real dates
+  - date: 2026-07-15
+    type: CPI
+    impact: high
+    note: "PLACEHOLDER — US CPI release (replace with real BLS date)"
+
+  # PLACEHOLDER — user must maintain real dates
+  - date: 2026-07-29
+    type: FOMC
+    impact: high
+    note: "PLACEHOLDER — FOMC rate decision (replace with real Fed date)"
+
+  # PLACEHOLDER — user must maintain real dates
+  - date: 2026-08-07
+    type: NFP
+    impact: high
+    note: "PLACEHOLDER — US Non-Farm Payrolls (replace with real BLS date)"
