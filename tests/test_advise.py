@@ -153,6 +153,46 @@ def test_advise_uses_explicit_open_positions_override_for_inv3() -> None:
     assert "limit" in result.plan.reason
 
 
+def test_advise_explicit_override_below_threshold_reaches_trade_plan() -> None:
+    """A non-zero explicit override that is still below both INV-3 thresholds
+    (1 position < 2, 1.9% risk < 2%) must size a plan, not just the all-zero
+    case already covered elsewhere -- proves the override branch itself
+    (not merely the store-fallback branch) can produce a TradePlan.
+    """
+    bars = _long_baseline_bars()
+    store = JournalStore(path=":memory:")
+    result = advise(
+        "SPY",
+        provider=_FakeProvider(bars),
+        calendar=_clear_calendar(bars[-1].date),
+        store=store,
+        config=CONFIG,
+        capital=CAPITAL,
+        options=AdviseOptions(open_positions=1, open_risk_pct=0.019),
+    )
+    assert isinstance(result.plan, TradePlan)
+
+
+def test_advise_partial_options_falls_back_to_store_open_exposure() -> None:
+    """Only one of open_positions/open_risk_pct set (bypassing the CLI's paired-flag
+    guard, e.g. a direct library caller) is documented `advise()`-layer behaviour: it
+    falls back to `store.open_exposure()` rather than raising -- the CLI/UI are
+    responsible for rejecting a lone flag before calling `advise()` at all.
+    """
+    bars = _long_baseline_bars()
+    store = JournalStore(path=":memory:")
+    result = advise(
+        "SPY",
+        provider=_FakeProvider(bars),
+        calendar=_clear_calendar(bars[-1].date),
+        store=store,
+        config=CONFIG,
+        capital=CAPITAL,
+        options=AdviseOptions(open_positions=2),
+    )
+    assert isinstance(result.plan, TradePlan)
+
+
 def test_advise_falls_back_to_store_open_exposure_when_not_given() -> None:
     bars = _long_baseline_bars()
     store = JournalStore(path=":memory:")

@@ -124,6 +124,23 @@ def test_analyze_without_open_exposure_flags_can_reach_a_trade_plan(
     assert "NO TRADE" not in result.stdout.upper()
 
 
+def test_analyze_with_explicit_flags_below_threshold_reaches_a_trade_plan(
+    tmp_path: Path, qualifying_provider: None
+) -> None:
+    """Real CLI flags set (not omitted) below both INV-3 thresholds must still reach
+    a TradePlan -- the earlier at-limit/over-limit tests only prove the veto side of
+    this branch; this proves explicit sub-threshold flags aren't misread as a veto.
+    """
+    db_path = tmp_path / "advisor.sqlite"
+    result = runner.invoke(
+        app,
+        ["analyze", "SPY", "--offline", "--db", str(db_path), "--open-positions", "1",
+         "--open-risk-pct", "0.01"],
+    )
+    assert result.exit_code == 0
+    assert "NO TRADE" not in result.stdout.upper()
+
+
 # --- lone --open-positions/--open-risk-pct flag errors instead of silent drop ------
 
 
