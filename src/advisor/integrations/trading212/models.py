@@ -82,6 +82,7 @@ class Position(BaseModel):
 
     @classmethod
     def from_api(cls, raw: dict) -> "Position":
+        """Build a `Position` from one raw `/equity/portfolio` array element."""
         raw = _require_dict(raw, "position")
         return _build_or_malformed(cls, **_position_fields(raw))
 
@@ -97,5 +98,6 @@ class AccountSummary(BaseModel):
 
     @classmethod
     def from_api(cls, raw: dict) -> "AccountSummary":
+        """Build an `AccountSummary` from the raw `/equity/account/summary` object."""
         raw = _require_dict(raw, "account summary")
         return _build_or_malformed(cls, **_account_summary_fields(raw))

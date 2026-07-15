@@ -47,6 +47,7 @@ class Trading212Client:
         credentials: Trading212Credentials,
         transport_factory: Callable = UrllibTransport,
     ) -> "Trading212Client":
+        """Build a client wired to the real Trading212 API via `credentials`."""
         transport = transport_factory(
             base_url=credentials.base_url(),
             authorization_header=credentials.authorization_header(),
@@ -54,12 +55,14 @@ class Trading212Client:
         return cls(transport)
 
     def positions(self) -> list[Position]:
+        """Return the account's open Invest/ISA positions."""
         payload = self._get_json(_POSITIONS_PATH)
         if not isinstance(payload, list):
             raise Trading212MalformedResponse("expected a list of positions")
         return [Position.from_api(raw) for raw in payload]
 
     def account_summary(self) -> AccountSummary:
+        """Return the account's cash/balance summary."""
         payload = self._get_json(_ACCOUNT_SUMMARY_PATH)
         return AccountSummary.from_api(payload)
 
