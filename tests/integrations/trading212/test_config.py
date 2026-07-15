@@ -5,6 +5,7 @@ mapping, never the real environment or the network.
 """
 
 import base64
+import os
 
 import pytest
 
@@ -77,3 +78,27 @@ def test_credentials_constructed_directly_still_redact() -> None:
     credentials = Trading212Credentials(api_key="directkey", api_secret="directsecret")
     assert "directkey" not in repr(credentials)
     assert "directsecret" not in repr(credentials)
+
+
+def test_load_credentials_with_no_arg_does_not_read_os_environ(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """`load_credentials()` must never silently fall back to the real process
+    environment -- only an explicitly-passed mapping is honored (INV-5 seam:
+    callers opt in to `os.environ` by passing it, it is never read implicitly).
+    """
+    monkeypatch.setenv("T212_API_KEY", "real-process-env-key")
+    monkeypatch.setenv("T212_API_SECRET", "real-process-env-secret")
+    with pytest.raises(Trading212AuthError):
+        load_credentials()
+
+
+def test_load_credentials_accepts_os_environ_when_explicitly_passed(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Passing `os.environ` explicitly is the supported way to read real env vars."""
+    monkeypatch.setenv("T212_API_KEY", "real-process-env-key")
+    monkeypatch.setenv("T212_API_SECRET", "real-process-env-secret")
+    credentials = load_credentials(os.environ)
+    assert credentials.environment == Trading212Environment.DEMO
+    assert "real-process-env-key" not in repr(credentials)

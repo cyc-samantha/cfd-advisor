@@ -161,3 +161,54 @@ def test_account_summary_wrong_top_level_container_raises_malformed(body: str) -
     client = _client(200, body)
     with pytest.raises(Trading212MalformedResponse):
         client.account_summary()
+
+
+def test_positions_mixed_valid_and_malformed_row_fails_whole_batch() -> None:
+    """A single bad row must reject the whole batch, never silently skip it."""
+    valid_row = {
+        "quantity": 10.0,
+        "averagePricePaid": 145.20,
+        "currentPrice": 151.75,
+        "instrument": {"ticker": "AAPL_US_EQ"},
+    }
+    malformed_row = {
+        "quantity": 4.0,
+        "averagePricePaid": 402.10,
+        "currentPrice": 398.60,
+        "instrument": {"currency": "USD"},  # missing required ticker
+    }
+    client = _client(200, json.dumps([valid_row, malformed_row]))
+    with pytest.raises(Trading212MalformedResponse):
+        client.positions()
+
+
+def test_positions_malformed_row_before_valid_row_still_fails_whole_batch() -> None:
+    """Row order must not matter: a leading bad row still rejects the batch."""
+    malformed_row = {
+        "quantity": 4.0,
+        "averagePricePaid": 402.10,
+        "currentPrice": 398.60,
+        "instrument": {"currency": "USD"},  # missing required ticker
+    }
+    valid_row = {
+        "quantity": 10.0,
+        "averagePricePaid": 145.20,
+        "currentPrice": 151.75,
+        "instrument": {"ticker": "AAPL_US_EQ"},
+    }
+    client = _client(200, json.dumps([malformed_row, valid_row]))
+    with pytest.raises(Trading212MalformedResponse):
+        client.positions()
+
+
+def test_positions_unicode_ticker_maps_via_fixture_json() -> None:
+    """Unicode/special-character tickers must round-trip through JSON decode + mapping."""
+    row = {
+        "quantity": 1.0,
+        "averagePricePaid": 50.0,
+        "currentPrice": 52.0,
+        "instrument": {"ticker": "日本電気_JP_EQ"},
+    }
+    client = _client(200, json.dumps([row], ensure_ascii=False))
+    positions = client.positions()
+    assert positions[0].ticker == "日本電気_JP_EQ"

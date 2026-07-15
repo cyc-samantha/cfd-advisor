@@ -115,6 +115,28 @@ def test_position_wallet_impact_present_but_non_dict_raises_malformed() -> None:
         Position.from_api(payload)
 
 
+def test_position_from_api_unicode_ticker_preserved() -> None:
+    payload = {
+        "quantity": 10.0,
+        "averagePricePaid": 100.5,
+        "currentPrice": 105.25,
+        "instrument": {"ticker": "日本電気_JP_EQ"},
+    }
+    position = Position.from_api(payload)
+    assert position.ticker == "日本電気_JP_EQ"
+
+
+def test_position_from_api_ticker_with_special_characters_preserved() -> None:
+    payload = {
+        "quantity": 10.0,
+        "averagePricePaid": 100.5,
+        "currentPrice": 105.25,
+        "instrument": {"ticker": "BRK.B_US_EQ"},
+    }
+    position = Position.from_api(payload)
+    assert position.ticker == "BRK.B_US_EQ"
+
+
 def test_models_are_frozen() -> None:
     position = Position.from_api(
         {
