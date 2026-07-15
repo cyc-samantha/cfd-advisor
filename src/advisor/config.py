@@ -8,7 +8,7 @@ place that parses it into typed values.
 from pathlib import Path
 
 import yaml
-from pydantic import BaseModel
+from pydantic import BaseModel, model_validator
 
 DEFAULT_CONFIG_PATH = Path(__file__).resolve().parents[2] / "config.yaml"
 
@@ -34,6 +34,19 @@ class AppConfig(BaseModel):
     capital_default: float
     max_open_positions: int
     max_open_risk_pct: float
+
+    @model_validator(mode="after")
+    def _risk_pct_within_bounds(self) -> "AppConfig":
+        # SPEC A4: risk_pct must stay within the configured 0.25%-2% band.
+        if not (self.risk_pct_min <= self.risk_pct <= self.risk_pct_max):
+            raise ValueError(
+                f"risk_pct {self.risk_pct} outside [{self.risk_pct_min}, {self.risk_pct_max}]"
+            )
+        return self
+
+    def cfd_symbol_for(self, target: str) -> str:
+        """Trading212 CFD symbol for ``target``, or ``target`` itself if unknown."""
+        return next((t.cfd_symbol for t in self.targets if t.symbol == target), target)
 
 
 def _read_yaml(path: Path, missing_message: str) -> dict:

@@ -4,7 +4,7 @@ from datetime import date, timedelta
 
 import pytest
 
-from advisor.advise import advise, build_provider
+from advisor.advise import AdviseOptions, advise, build_provider
 from advisor.analysis.events import EventCalendar, MacroEvent
 from advisor.config import load_config
 from advisor.datasource.base import CsvFixtureProvider, DataUnavailable, MarketDataProvider
@@ -139,8 +139,7 @@ def test_advise_blackout_vetoes_even_when_signal_would_pass() -> None:
         store=store,
         config=CONFIG,
         capital=CAPITAL,
-        open_positions=0,
-        open_risk_pct=0.0,
+        options=AdviseOptions(open_positions=0, open_risk_pct=0.0),
     )
     assert isinstance(result, NoTrade)
     assert "CPI" in result.reason
@@ -161,8 +160,7 @@ def test_advise_returns_trade_plan_when_clear_and_scored_high() -> None:
         store=store,
         config=CONFIG,
         capital=CAPITAL,
-        open_positions=0,
-        open_risk_pct=0.0,
+        options=AdviseOptions(open_positions=0, open_risk_pct=0.0),
     )
     assert isinstance(result, TradePlan)
     row = store.list_suggestions()[0]
@@ -180,8 +178,7 @@ def test_advise_uses_explicit_open_positions_override_for_inv3() -> None:
         store=store,
         config=CONFIG,
         capital=CAPITAL,
-        open_positions=2,
-        open_risk_pct=0.0,
+        options=AdviseOptions(open_positions=2, open_risk_pct=0.0),
     )
     assert isinstance(result, NoTrade)
     assert "limit" in result.reason
@@ -214,8 +211,7 @@ def test_advise_propagates_when_journal_write_fails() -> None:
             store=_RaisingStore(),
             config=CONFIG,
             capital=CAPITAL,
-            open_positions=0,
-            open_risk_pct=0.0,
+            options=AdviseOptions(open_positions=0, open_risk_pct=0.0),
         )
 
 
@@ -228,3 +224,11 @@ def test_build_provider_offline_returns_fixture_provider() -> None:
 
 def test_build_provider_online_returns_yfinance_provider() -> None:
     assert isinstance(build_provider(offline=False), YFinanceProvider)
+
+
+# --- AdviseOptions is typed, not a **overrides dict --------------------------------
+
+
+def test_advise_options_rejects_misspelled_field() -> None:
+    with pytest.raises(TypeError):
+        AdviseOptions(open_position=2)  # type: ignore[call-arg]

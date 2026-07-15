@@ -2,13 +2,17 @@
 
 from __future__ import annotations
 
+from dataclasses import dataclass
+from datetime import date
+
 import typer
 
-from advisor.advise import advise, build_provider
-from advisor.analysis.events import load_events
-from advisor.config import load_config
+from advisor.advise import AdviseOptions, advise, build_provider
+from advisor.analysis.events import EventCalendar, holding_event_note, load_events
+from advisor.config import AppConfig, load_config
 from advisor.journal.store import JournalStore
 from advisor.render import DISCLAIMER, render_card
+from advisor.strategy.models import TradePlan
 
 __all__ = ["DISCLAIMER", "app"]
 
@@ -32,19 +36,44 @@ def analyze(
     capital: float = typer.Option(10000, help="CFD account equity in USD."),
     offline: bool = typer.Option(True, help="Use frozen fixture data instead of yfinance."),
     db: str = typer.Option("data/advisor.sqlite", help="Path to the journal SQLite database."),
+    open_positions: int = typer.Option(
+        None, "--open-positions", help="Currently open CFD positions (INV-3)."
+    ),
+    open_risk_pct: float = typer.Option(
+        None, "--open-risk-pct", help="Currently open risk as a fraction of capital (INV-3)."
+    ),
 ) -> None:
     """Analyse a target and print a trade plan or no-trade card (INV-4: journals first)."""
     config = load_config()
-    result = advise(
-        target,
-        provider=build_provider(offline=offline),
-        calendar=load_events(),
-        store=JournalStore(path=db),
-        config=config,
-        capital=capital,
+    calendar = load_events()
+    args = _AnalyzeArgs(
+        target, capital, offline, db,
+        AdviseOptions(open_positions=open_positions, open_risk_pct=open_risk_pct),
     )
-    cfd_symbol = next((t.cfd_symbol for t in config.targets if t.symbol == target), target)
-    typer.echo(render_card(result, cfd_symbol=cfd_symbol))
+    result = _run_advise(args, config, calendar)
+    typer.echo(_render_result(result, config, calendar, target))
+
+
+@dataclass(frozen=True)
+class _AnalyzeArgs:
+    target: str
+    capital: float
+    offline: bool
+    db: str
+    options: AdviseOptions
+
+
+def _run_advise(args: _AnalyzeArgs, config: AppConfig, calendar: EventCalendar):
+    return advise(
+        args.target, provider=build_provider(offline=args.offline), calendar=calendar,
+        store=JournalStore(path=args.db), config=config, capital=args.capital, options=args.options,
+    )
+
+
+def _render_result(result, config: AppConfig, calendar: EventCalendar, target: str) -> str:
+    is_trade = isinstance(result, TradePlan)
+    event_note = holding_event_note(date.today(), calendar.events) if is_trade else None
+    return render_card(result, cfd_symbol=config.cfd_symbol_for(target), event_note=event_note)
 
 
 @app.command()

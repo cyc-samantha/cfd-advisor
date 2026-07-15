@@ -6,14 +6,17 @@ place the analysis/veto/sizing policy lives. Provider selection is gated on
 """
 
 import os
+from dataclasses import dataclass
+from datetime import date
 
 import streamlit as st
 
-from advisor.advise import advise, build_provider
-from advisor.analysis.events import EventCalendar, load_events
+from advisor.advise import AdviseOptions, advise, build_provider
+from advisor.analysis.events import EventCalendar, holding_event_note, load_events
 from advisor.config import AppConfig, load_config
 from advisor.journal.store import JournalStore
 from advisor.render import DISCLAIMER, render_card
+from advisor.strategy.models import TradePlan
 
 DB_PATH = "data/advisor.sqlite"
 
@@ -22,17 +25,33 @@ def _is_offline() -> bool:
     return os.environ.get("ADVISOR_OFFLINE", "1") != "0"
 
 
-def _cfd_symbol(config: AppConfig, target: str) -> str:
-    return next((t.cfd_symbol for t in config.targets if t.symbol == target), target)
+@dataclass(frozen=True)
+class _Inputs:
+    target: str
+    capital: float
+    open_positions: int
+    open_risk_pct: float
 
 
-def _show_result(target: str, config: AppConfig, calendar: EventCalendar, capital: float) -> None:
+def _advise_options(inputs: _Inputs) -> AdviseOptions:
+    return AdviseOptions(open_positions=inputs.open_positions, open_risk_pct=inputs.open_risk_pct)
+
+
+def _run_advise(inputs: _Inputs, config: AppConfig, calendar: EventCalendar) -> TradePlan | object:
     store = JournalStore(path=DB_PATH)
     provider = build_provider(offline=_is_offline())
-    result = advise(
-        target, provider=provider, calendar=calendar, store=store, config=config, capital=capital
+    return advise(
+        inputs.target, provider=provider, calendar=calendar, store=store,
+        config=config, capital=inputs.capital, options=_advise_options(inputs),
     )
-    st.text(render_card(result, cfd_symbol=_cfd_symbol(config, target)))
+
+
+def _show_result(inputs: _Inputs, config: AppConfig, calendar: EventCalendar) -> None:
+    result = _run_advise(inputs, config, calendar)
+    is_trade = isinstance(result, TradePlan)
+    event_note = holding_event_note(date.today(), calendar.events) if is_trade else None
+    cfd_symbol = config.cfd_symbol_for(inputs.target)
+    st.text(render_card(result, cfd_symbol=cfd_symbol, event_note=event_note))
 
 
 def _render_footer(calendar: EventCalendar) -> None:
@@ -40,18 +59,20 @@ def _render_footer(calendar: EventCalendar) -> None:
     st.caption(DISCLAIMER)
 
 
-def _render_inputs(config: AppConfig) -> tuple[str, float]:
+def _render_inputs(config: AppConfig) -> _Inputs:
     target = st.selectbox("Target", [t.symbol for t in config.targets])
     capital = st.number_input("Account capital (USD)", value=float(config.capital_default))
-    return target, capital
+    open_positions = st.number_input("Open positions (INV-3)", min_value=0, value=0, step=1)
+    open_risk_pct = st.number_input("Open risk % (INV-3)", min_value=0.0, value=0.0, step=0.1) / 100
+    return _Inputs(target, capital, open_positions, open_risk_pct)
 
 
 def _render_page() -> None:
     config = load_config()
     calendar = load_events()
-    target, capital = _render_inputs(config)
+    inputs = _render_inputs(config)
     if st.button("Analyze"):
-        _show_result(target, config, calendar, capital)
+        _show_result(inputs, config, calendar)
     _render_footer(calendar)
 
 

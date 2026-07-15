@@ -6,11 +6,13 @@ from pathlib import Path
 import pytest
 
 from advisor.analysis.events import (
+    HOLDING_WINDOW_DAYS,
     EventCalendar,
     MacroEvent,
     StaleCalendar,
     blackout_reason,
     event_gate,
+    holding_event_note,
     is_blackout,
     load_events,
 )
@@ -145,3 +147,26 @@ def test_event_gate_passes_outside_blackout() -> None:
 
 def test_stale_calendar_is_an_exception() -> None:
     assert issubclass(StaleCalendar, Exception)
+
+
+# --- holding_event_note (SPEC §6 gap-risk warning) --------------------------------
+
+
+def test_holding_event_note_none_when_no_event_in_window() -> None:
+    calendar = _calendar(HIGH_IMPACT_EVENT)
+    as_of = HIGH_IMPACT_EVENT.date - timedelta(days=HOLDING_WINDOW_DAYS + 5)
+    assert holding_event_note(as_of, calendar.events) is None
+
+
+def test_holding_event_note_present_when_event_inside_window() -> None:
+    calendar = _calendar(HIGH_IMPACT_EVENT)
+    as_of = HIGH_IMPACT_EVENT.date - timedelta(days=HOLDING_WINDOW_DAYS - 1)
+    note = holding_event_note(as_of, calendar.events)
+    assert note is not None
+    assert "CPI" in note
+    assert "2026-07-15" in note
+
+
+def test_holding_event_note_ignores_low_impact_events() -> None:
+    calendar = _calendar(LOW_IMPACT_EVENT)
+    assert holding_event_note(LOW_IMPACT_EVENT.date, calendar.events) is None

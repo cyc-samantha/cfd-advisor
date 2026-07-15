@@ -27,6 +27,20 @@ def build_provider(offline: bool) -> MarketDataProvider:
 
 
 @dataclass(frozen=True)
+class AdviseOptions:
+    """Explicit, typed overrides for the open-exposure/as_of inputs to :func:`advise`.
+
+    Replaces a ``**overrides`` dict (former footgun: a mistyped key like
+    ``open_position`` would silently be dropped by ``.get(...)`` and the
+    INV-3 exposure check would size the plan as if the account were flat).
+    """
+
+    open_positions: int | None = None
+    open_risk_pct: float | None = None
+    as_of: date_ | None = None
+
+
+@dataclass(frozen=True)
 class _AdviseRequest:
     target: str
     provider: MarketDataProvider
@@ -40,13 +54,14 @@ class _AdviseRequest:
 
 
 # Analyse `target` and return a journaled TradePlan or NoTrade (INV-4).
-# `**overrides` accepts open_positions/open_risk_pct/as_of by keyword -- kept
-# out of the explicit signature only to fit the per-function line-count cap.
 def advise(
     target: str, *, provider: MarketDataProvider, calendar: EventCalendar,
-    store: JournalStore, config: AppConfig, capital: float, **overrides
+    store: JournalStore, config: AppConfig, capital: float,
+    options: AdviseOptions | None = None,
 ) -> TradePlan | NoTrade:
-    request = _build_request(target, provider, calendar, store, config, capital, overrides)
+    request = _build_request(
+        target, provider, calendar, store, config, capital, options or AdviseOptions()
+    )
     return _advise(request)
 
 
@@ -57,27 +72,20 @@ def _build_request(
     store: JournalStore,
     config: AppConfig,
     capital: float,
-    overrides: dict,
+    options: AdviseOptions,
 ) -> _AdviseRequest:
     return _AdviseRequest(
         target, provider, calendar, store, config, capital,
-        overrides.get("open_positions"), overrides.get("open_risk_pct"), overrides.get("as_of"),
+        options.open_positions, options.open_risk_pct, options.as_of,
     )
 
 
 def _advise(request: _AdviseRequest) -> TradePlan | NoTrade:
-    cfd_symbol = _cfd_symbol(request.config, request.target)
+    cfd_symbol = request.config.cfd_symbol_for(request.target)
     bars, error = _try_load_bars(request.provider, request.target)
     if bars is None:
         return _journal_no_trade(request, cfd_symbol, error)
     return _advise_with_bars(request, bars, cfd_symbol)
-
-
-def _cfd_symbol(config: AppConfig, target: str) -> str:
-    for entry in config.targets:
-        if entry.symbol == target:
-            return entry.cfd_symbol
-    return target
 
 
 def _try_load_bars(

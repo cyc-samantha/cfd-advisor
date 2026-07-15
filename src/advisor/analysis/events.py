@@ -20,6 +20,11 @@ DEFAULT_EVENTS_PATH = Path(__file__).resolve().parents[3] / "data" / "events.yam
 
 HIGH_IMPACT = "high"
 
+# SPEC §6: swing trades are held "days to a few weeks" (§1 non-goals); no
+# config field exists for the hold length, so this is a documented estimate
+# used only for the card's advisory gap-risk note (not a hard veto).
+HOLDING_WINDOW_DAYS = 14
+
 
 class MacroEvent(BaseModel):
     """One macro calendar entry (SPEC §6 schema)."""
@@ -84,6 +89,18 @@ def blackout_reason(as_of: date_, events: list[MacroEvent], blackout_days: int) 
     if event is None:
         return None
     return f"{event.type} on {event.date.isoformat()} — within {blackout_days}-day blackout"
+
+
+def holding_event_note(
+    as_of: date_, events: list[MacroEvent], window_days: int = HOLDING_WINDOW_DAYS
+) -> str | None:
+    """Gap-risk warning for a high-impact event inside the expected holding window."""
+    window_end = as_of + timedelta(days=window_days)
+    upcoming = [e for e in events if e.impact == HIGH_IMPACT and as_of <= e.date <= window_end]
+    if not upcoming:
+        return None
+    event = min(upcoming, key=lambda e: e.date)
+    return f"Gap risk: {event.type} on {event.date.isoformat()} falls within the expected hold"
 
 
 def event_gate(as_of: date_, events: list[MacroEvent], blackout_days: int) -> GateResult:
