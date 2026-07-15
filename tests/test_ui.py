@@ -1,6 +1,7 @@
 """Smoke tests for the Streamlit single-page UI (SPEC §4, §8 INV-5, Phase 3)."""
 
 import os
+from datetime import timedelta
 
 import pytest
 from streamlit.testing.v1 import AppTest
@@ -71,3 +72,26 @@ def test_ui_two_open_positions_forces_no_trade_on_analyze(qualifying_provider: N
     assert not at.exception
     assert "NO TRADE" in at.text[0].value.upper()
     assert "limit" in at.text[0].value
+
+
+def test_ui_analyze_event_note_anchors_to_analysis_as_of(
+    qualifying_provider: None, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A high-impact event just after the fixture's last bar date must surface a gap-risk
+    note, even though it is nowhere near wall-clock `date.today()` -- the note must be
+    anchored to the same `as_of` the trade plan itself was analysed against.
+    """
+    from advisor.analysis.events import EventCalendar, MacroEvent
+
+    last_bar_date = qualifying_bars()[-1].date
+    event_date = last_bar_date + timedelta(days=5)  # past blackout_days=2, within 14-day hold
+    calendar = EventCalendar(
+        last_updated=last_bar_date,
+        events=[MacroEvent(date=event_date, type="FOMC", impact="high", note="")],
+    )
+    monkeypatch.setattr("advisor.analysis.events.load_events", lambda: calendar)
+    at = _offline_app().run()
+    at.button[0].click().run()
+    assert not at.exception
+    assert "NO TRADE" not in at.text[0].value.upper()
+    assert "Gap risk" in at.text[0].value
