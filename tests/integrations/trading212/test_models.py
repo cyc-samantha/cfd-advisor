@@ -93,6 +93,28 @@ def test_position_from_api_wrong_type_raises_malformed() -> None:
         Position.from_api(payload)
 
 
+def test_position_from_api_non_dict_top_level_raises_malformed() -> None:
+    with pytest.raises(Trading212MalformedResponse):
+        Position.from_api(["not", "a", "dict"])  # type: ignore[arg-type]
+
+
+def test_account_summary_from_api_non_dict_top_level_raises_malformed() -> None:
+    with pytest.raises(Trading212MalformedResponse):
+        AccountSummary.from_api("scalar")  # type: ignore[arg-type]
+
+
+def test_position_wallet_impact_present_but_non_dict_raises_malformed() -> None:
+    payload = {
+        "quantity": 10.0,
+        "averagePricePaid": 100.5,
+        "currentPrice": 105.25,
+        "instrument": {"ticker": "AAPL_US_EQ"},
+        "walletImpact": "not-a-dict",
+    }
+    with pytest.raises(Trading212MalformedResponse):
+        Position.from_api(payload)
+
+
 def test_models_are_frozen() -> None:
     position = Position.from_api(
         {

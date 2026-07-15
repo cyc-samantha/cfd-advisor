@@ -69,9 +69,7 @@ def _read_required_credentials(source: Mapping[str, str]) -> tuple[str, str]:
 def load_credentials(env: Mapping[str, str] | None = None) -> Trading212Credentials:
     """Build credentials from an env-like mapping; fails closed (Trading212AuthError) on blanks."""
     source = env or {}
-    pair = _read_required_credentials(source)
-    api_key = pair[0]
-    api_secret = pair[1]
+    api_key, api_secret = _read_required_credentials(source)
     environment_raw = source.get("T212_ENVIRONMENT", Trading212Environment.DEMO.value)
     environment = _parse_environment(environment_raw)
     return Trading212Credentials(api_key=api_key, api_secret=api_secret, environment=environment)

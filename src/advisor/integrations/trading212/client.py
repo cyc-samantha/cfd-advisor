@@ -55,6 +55,8 @@ class Trading212Client:
 
     def positions(self) -> list[Position]:
         payload = self._get_json(_POSITIONS_PATH)
+        if not isinstance(payload, list):
+            raise Trading212MalformedResponse("expected a list of positions")
         return [Position.from_api(raw) for raw in payload]
 
     def account_summary(self) -> AccountSummary:

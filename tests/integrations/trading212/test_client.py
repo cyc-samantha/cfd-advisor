@@ -133,3 +133,31 @@ def test_client_account_summary_uses_expected_path() -> None:
     transport = _StubTransport(200, _load_fixture("account_summary_ok.json"))
     Trading212Client(transport).account_summary()
     assert transport.requested_paths == ["/api/v0/equity/account/summary"]
+
+
+@pytest.mark.parametrize(
+    "body",
+    [
+        json.dumps({"error": "not a list"}),
+        json.dumps(5),
+        json.dumps("scalar"),
+    ],
+)
+def test_positions_wrong_top_level_container_raises_malformed(body: str) -> None:
+    client = _client(200, body)
+    with pytest.raises(Trading212MalformedResponse):
+        client.positions()
+
+
+@pytest.mark.parametrize(
+    "body",
+    [
+        json.dumps([1, 2, 3]),
+        json.dumps(5),
+        json.dumps("scalar"),
+    ],
+)
+def test_account_summary_wrong_top_level_container_raises_malformed(body: str) -> None:
+    client = _client(200, body)
+    with pytest.raises(Trading212MalformedResponse):
+        client.account_summary()

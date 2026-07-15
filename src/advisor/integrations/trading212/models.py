@@ -34,7 +34,10 @@ def _required_position_fields(instrument: dict, raw: dict) -> dict:
 
 
 def _optional_position_fields(raw: dict) -> dict:
-    wallet_impact = raw.get("walletImpact") or {}
+    wallet_impact_raw = raw.get("walletImpact")
+    wallet_impact = (
+        {} if wallet_impact_raw is None else _require_dict(wallet_impact_raw, "walletImpact")
+    )
     return {
         "unrealized_pl": wallet_impact.get("unrealizedProfitLoss"),
         "created_at": raw.get("createdAt"),
@@ -79,6 +82,7 @@ class Position(BaseModel):
 
     @classmethod
     def from_api(cls, raw: dict) -> "Position":
+        raw = _require_dict(raw, "position")
         return _build_or_malformed(cls, **_position_fields(raw))
 
 
@@ -93,4 +97,5 @@ class AccountSummary(BaseModel):
 
     @classmethod
     def from_api(cls, raw: dict) -> "AccountSummary":
+        raw = _require_dict(raw, "account summary")
         return _build_or_malformed(cls, **_account_summary_fields(raw))
