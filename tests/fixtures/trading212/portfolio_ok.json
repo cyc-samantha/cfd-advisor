@@ -1,0 +1,33 @@
+[
+  {
+    "_comment": "SCHEMA VERIFIED against docs.trading212.com; VALUES synthetic — replace with a one-time captured demo payload before wiring.",
+    "quantity": 10.0,
+    "averagePricePaid": 145.20,
+    "currentPrice": 151.75,
+    "instrument": {
+      "ticker": "AAPL_US_EQ",
+      "currency": "USD",
+      "isin": "US0378331005",
+      "name": "Apple Inc"
+    },
+    "walletImpact": {
+      "unrealizedProfitLoss": 65.5
+    },
+    "createdAt": "2026-06-01T09:30:00Z"
+  },
+  {
+    "quantity": 4.0,
+    "averagePricePaid": 402.10,
+    "currentPrice": 398.60,
+    "instrument": {
+      "ticker": "MSFT_US_EQ",
+      "currency": "USD",
+      "isin": "US5949181045",
+      "name": "Microsoft Corp"
+    },
+    "walletImpact": {
+      "unrealizedProfitLoss": -14.0
+    },
+    "createdAt": "2026-05-15T11:05:00Z"
+  }
+]
