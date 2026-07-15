@@ -14,6 +14,7 @@ Focus areas (per orchestrator instruction):
 import json
 
 import pytest
+from pydantic import ValidationError
 
 from advisor.integrations.trading212 import (
     AccountSummary,
@@ -196,5 +197,5 @@ def test_position_and_account_summary_define_no_price_history_methods():
 def test_positions_are_frozen():
     raw = _read_fixture("portfolio_ok.json")
     position = Position.from_api(raw[0])
-    with pytest.raises(Exception):
+    with pytest.raises(ValidationError):
         position.quantity = 999.0
