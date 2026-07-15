@@ -3,11 +3,10 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import date
 
 import typer
 
-from advisor.advise import AdviseOptions, advise, build_provider
+from advisor.advise import AdviseOptions, AdviseResult, advise, build_provider
 from advisor.analysis.events import EventCalendar, holding_event_note, load_events
 from advisor.config import AppConfig, load_config
 from advisor.journal.store import JournalStore
@@ -44,14 +43,29 @@ def analyze(
     ),
 ) -> None:
     """Analyse a target and print a trade plan or no-trade card (INV-4: journals first)."""
+    _validate_exposure_pair(open_positions, open_risk_pct)
     config = load_config()
     calendar = load_events()
-    args = _AnalyzeArgs(
-        target, capital, offline, db,
-        AdviseOptions(open_positions=open_positions, open_risk_pct=open_risk_pct),
-    )
+    args = _build_analyze_args(target, capital, offline, db, open_positions, open_risk_pct)
     result = _run_advise(args, config, calendar)
     typer.echo(_render_result(result, config, calendar, target))
+
+
+def _build_analyze_args(
+    target: str, capital: float, offline: bool, db: str,
+    open_positions: int | None, open_risk_pct: float | None,
+) -> _AnalyzeArgs:
+    options = AdviseOptions(open_positions=open_positions, open_risk_pct=open_risk_pct)
+    return _AnalyzeArgs(target, capital, offline, db, options)
+
+
+# WHY: a lone flag would otherwise be silently dropped by advise()'s
+# both-or-neither override check, masking the INV-3 exposure input.
+def _validate_exposure_pair(open_positions: int | None, open_risk_pct: float | None) -> None:
+    if (open_positions is None) != (open_risk_pct is None):
+        raise typer.BadParameter(
+            "--open-positions and --open-risk-pct must be given together (or both omitted)."
+        )
 
 
 @dataclass(frozen=True)
@@ -63,17 +77,19 @@ class _AnalyzeArgs:
     options: AdviseOptions
 
 
-def _run_advise(args: _AnalyzeArgs, config: AppConfig, calendar: EventCalendar):
+def _run_advise(args: _AnalyzeArgs, config: AppConfig, calendar: EventCalendar) -> AdviseResult:
     return advise(
         args.target, provider=build_provider(offline=args.offline), calendar=calendar,
         store=JournalStore(path=args.db), config=config, capital=args.capital, options=args.options,
     )
 
 
-def _render_result(result, config: AppConfig, calendar: EventCalendar, target: str) -> str:
-    is_trade = isinstance(result, TradePlan)
-    event_note = holding_event_note(date.today(), calendar.events) if is_trade else None
-    return render_card(result, cfd_symbol=config.cfd_symbol_for(target), event_note=event_note)
+def _render_result(
+    result: AdviseResult, config: AppConfig, calendar: EventCalendar, target: str
+) -> str:
+    is_trade = isinstance(result.plan, TradePlan)
+    event_note = holding_event_note(result.as_of, calendar.events) if is_trade else None
+    return render_card(result.plan, cfd_symbol=config.cfd_symbol_for(target), event_note=event_note)
 
 
 @app.command()

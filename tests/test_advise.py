@@ -11,6 +11,7 @@ from advisor.datasource.base import CsvFixtureProvider, DataUnavailable, MarketD
 from advisor.datasource.yfinance_provider import YFinanceProvider
 from advisor.journal.store import JournalStore
 from advisor.strategy.models import Bar, NoTrade, TradePlan
+from conftest import qualifying_bars as _long_baseline_bars
 
 CONFIG = load_config()
 CAPITAL = 10_000.0
@@ -43,38 +44,6 @@ class _RaisingStore:
         return (0, 0.0)
 
 
-def _bar(d, o, h, low_, c, v=1_000_000) -> Bar:
-    return Bar(date=d, open=o, high=max(h, o, c), low=min(low_, o, c), close=c, volume=v)
-
-
-def _long_baseline_bars() -> list[Bar]:
-    """220 all-pass-gate LONG bars (mirrors test_signal.py's baseline)."""
-    n = 220
-    start = date(2025, 1, 1)
-    closes = [400.0 + i * 0.8 for i in range(n)]
-    bars = [
-        _bar(start + timedelta(days=i), c - 0.1, c + 0.3, c - 0.4, c) for i, c in enumerate(closes)
-    ]
-    tail_start = n - 14
-    base = closes[tail_start - 1]
-    offsets = [0.5, 1.0, 4.0, 2.5, 1.0, 0.0, -1.5, -3.0, -3.8, -3.5, -3.0, -3.2, -2.8]
-    for j, off in enumerate(offsets):
-        idx = tail_start + j
-        c = base + off
-        bars[idx] = _bar(bars[idx].date, c - 0.15, c + 0.25, c - 0.3, c)
-    prev_high = bars[n - 2].high
-    final_close = prev_high + 0.5
-    bars[n - 1] = _bar(
-        bars[n - 1].date,
-        prev_high + 0.1,
-        final_close + 0.2,
-        prev_high - 0.2,
-        final_close,
-        1_500_000,
-    )
-    return bars
-
-
 def _clear_calendar(as_of: date) -> EventCalendar:
     future_event = MacroEvent(date=as_of + timedelta(days=30), type="FOMC", impact="high", note="")
     return EventCalendar(last_updated=as_of, events=[future_event])
@@ -103,8 +72,8 @@ def test_advise_data_unavailable_returns_no_trade_and_journals() -> None:
         config=CONFIG,
         capital=CAPITAL,
     )
-    assert isinstance(result, NoTrade)
-    assert "data unavailable" in result.reason
+    assert isinstance(result.plan, NoTrade)
+    assert "data unavailable" in result.plan.reason
     assert len(store.list_suggestions()) == 1
 
 
@@ -122,8 +91,8 @@ def test_advise_stale_calendar_blocks_trade() -> None:
         config=CONFIG,
         capital=CAPITAL,
     )
-    assert isinstance(result, NoTrade)
-    assert "stale" in result.reason
+    assert isinstance(result.plan, NoTrade)
+    assert "stale" in result.plan.reason
 
 
 # --- blackout hard veto (AC 2) --------------------------------------------------
@@ -141,8 +110,8 @@ def test_advise_blackout_vetoes_even_when_signal_would_pass() -> None:
         capital=CAPITAL,
         options=AdviseOptions(open_positions=0, open_risk_pct=0.0),
     )
-    assert isinstance(result, NoTrade)
-    assert "CPI" in result.reason
+    assert isinstance(result.plan, NoTrade)
+    assert "CPI" in result.plan.reason
     row = store.list_suggestions()[0]
     assert row["kind"] == "no_trade"
 
@@ -162,7 +131,7 @@ def test_advise_returns_trade_plan_when_clear_and_scored_high() -> None:
         capital=CAPITAL,
         options=AdviseOptions(open_positions=0, open_risk_pct=0.0),
     )
-    assert isinstance(result, TradePlan)
+    assert isinstance(result.plan, TradePlan)
     row = store.list_suggestions()[0]
     assert row["kind"] == "trade"
     assert row["target"] == "SPY"
@@ -180,8 +149,8 @@ def test_advise_uses_explicit_open_positions_override_for_inv3() -> None:
         capital=CAPITAL,
         options=AdviseOptions(open_positions=2, open_risk_pct=0.0),
     )
-    assert isinstance(result, NoTrade)
-    assert "limit" in result.reason
+    assert isinstance(result.plan, NoTrade)
+    assert "limit" in result.plan.reason
 
 
 def test_advise_falls_back_to_store_open_exposure_when_not_given() -> None:
@@ -195,7 +164,32 @@ def test_advise_falls_back_to_store_open_exposure_when_not_given() -> None:
         config=CONFIG,
         capital=CAPITAL,
     )
-    assert isinstance(result, TradePlan)
+    assert isinstance(result.plan, TradePlan)
+
+
+# --- as_of anchor: resolved value, not wall-clock date.today() -------------------
+
+
+def test_advise_result_as_of_matches_last_bar_date_not_wall_clock() -> None:
+    """The as_of used to journal/score must be the one callers render notes against.
+
+    Regression guard: the fixture's last bar date and `date.today()` diverge in
+    offline mode, so a caller anchoring a second artefact (e.g. the event/gap-risk
+    note) to `date.today()` would be inconsistent with the analysed trade.
+    """
+    bars = _long_baseline_bars()
+    store = JournalStore(path=":memory:")
+    result = advise(
+        "SPY",
+        provider=_FakeProvider(bars),
+        calendar=_clear_calendar(bars[-1].date),
+        store=store,
+        config=CONFIG,
+        capital=CAPITAL,
+        options=AdviseOptions(open_positions=0, open_risk_pct=0.0),
+    )
+    assert result.as_of == bars[-1].date
+    assert result.as_of != date.today()
 
 
 # --- INV-4: journal-before-return is not bypassable on write failure -----------

@@ -41,6 +41,19 @@ class AdviseOptions:
 
 
 @dataclass(frozen=True)
+class AdviseResult:
+    """A `TradePlan`/`NoTrade` paired with the `as_of` date it was analysed against.
+
+    Callers that render a second artefact keyed on time (e.g. the event/gap-risk
+    note) must anchor it to this `as_of`, not wall-clock `date.today()` --
+    `advise()` may resolve `as_of` to the fixture's last bar date rather than today.
+    """
+
+    plan: TradePlan | NoTrade
+    as_of: date_
+
+
+@dataclass(frozen=True)
 class _AdviseRequest:
     target: str
     provider: MarketDataProvider
@@ -53,12 +66,13 @@ class _AdviseRequest:
     as_of: date_ | None
 
 
-# Analyse `target` and return a journaled TradePlan or NoTrade (INV-4).
+# Analyse `target` and return a journaled TradePlan or NoTrade (INV-4), paired
+# with the `as_of` date it was analysed against (see `AdviseResult`).
 def advise(
     target: str, *, provider: MarketDataProvider, calendar: EventCalendar,
     store: JournalStore, config: AppConfig, capital: float,
     options: AdviseOptions | None = None,
-) -> TradePlan | NoTrade:
+) -> AdviseResult:
     request = _build_request(
         target, provider, calendar, store, config, capital, options or AdviseOptions()
     )
@@ -80,7 +94,7 @@ def _build_request(
     )
 
 
-def _advise(request: _AdviseRequest) -> TradePlan | NoTrade:
+def _advise(request: _AdviseRequest) -> AdviseResult:
     cfd_symbol = request.config.cfd_symbol_for(request.target)
     bars, error = _try_load_bars(request.provider, request.target)
     if bars is None:
@@ -97,21 +111,21 @@ def _try_load_bars(
         return None, exc.reason
 
 
-def _journal_no_trade(request: _AdviseRequest, cfd_symbol: str, error: str) -> NoTrade:
+def _journal_no_trade(request: _AdviseRequest, cfd_symbol: str, error: str) -> AdviseResult:
     as_of = request.as_of or date_.today()
     no_trade = NoTrade(target=request.target, reason=f"data unavailable: {error}", gates=[])
     request.store.record(no_trade, as_of=as_of, cfd_symbol=cfd_symbol)
-    return no_trade
+    return AdviseResult(plan=no_trade, as_of=as_of)
 
 
 def _advise_with_bars(
     request: _AdviseRequest, bars: list[Bar], cfd_symbol: str
-) -> TradePlan | NoTrade:
+) -> AdviseResult:
     as_of = request.as_of or bars[-1].date
     veto = _calendar_veto(request.calendar, as_of, request.config.blackout_days, request.target)
     result = veto or _score_and_size(request, bars, as_of)
     request.store.record(result, as_of=as_of, cfd_symbol=cfd_symbol)
-    return result
+    return AdviseResult(plan=result, as_of=as_of)
 
 
 def _calendar_veto(

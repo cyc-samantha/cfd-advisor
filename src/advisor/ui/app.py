@@ -7,11 +7,10 @@ place the analysis/veto/sizing policy lives. Provider selection is gated on
 
 import os
 from dataclasses import dataclass
-from datetime import date
 
 import streamlit as st
 
-from advisor.advise import AdviseOptions, advise, build_provider
+from advisor.advise import AdviseOptions, AdviseResult, advise, build_provider
 from advisor.analysis.events import EventCalendar, holding_event_note, load_events
 from advisor.config import AppConfig, load_config
 from advisor.journal.store import JournalStore
@@ -37,7 +36,7 @@ def _advise_options(inputs: _Inputs) -> AdviseOptions:
     return AdviseOptions(open_positions=inputs.open_positions, open_risk_pct=inputs.open_risk_pct)
 
 
-def _run_advise(inputs: _Inputs, config: AppConfig, calendar: EventCalendar) -> TradePlan | object:
+def _run_advise(inputs: _Inputs, config: AppConfig, calendar: EventCalendar) -> AdviseResult:
     store = JournalStore(path=DB_PATH)
     provider = build_provider(offline=_is_offline())
     return advise(
@@ -48,10 +47,10 @@ def _run_advise(inputs: _Inputs, config: AppConfig, calendar: EventCalendar) -> 
 
 def _show_result(inputs: _Inputs, config: AppConfig, calendar: EventCalendar) -> None:
     result = _run_advise(inputs, config, calendar)
-    is_trade = isinstance(result, TradePlan)
-    event_note = holding_event_note(date.today(), calendar.events) if is_trade else None
+    is_trade = isinstance(result.plan, TradePlan)
+    event_note = holding_event_note(result.as_of, calendar.events) if is_trade else None
     cfd_symbol = config.cfd_symbol_for(inputs.target)
-    st.text(render_card(result, cfd_symbol=cfd_symbol, event_note=event_note))
+    st.text(render_card(result.plan, cfd_symbol=cfd_symbol, event_note=event_note))
 
 
 def _render_footer(calendar: EventCalendar) -> None:

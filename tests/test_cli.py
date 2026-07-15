@@ -1,6 +1,6 @@
 """Tests for the typer CLI (SPEC §9 Phase 0/3)."""
 
-from datetime import date, timedelta
+from datetime import timedelta
 from pathlib import Path
 
 import pytest
@@ -10,44 +10,17 @@ import advisor.cli as cli_module
 from advisor.cli import DISCLAIMER, app
 from advisor.datasource.base import MarketDataProvider
 from advisor.strategy.models import Bar
+from conftest import qualifying_bars
 
 runner = CliRunner()
 
 
-def _bar(d, o, h, low_, c, v=1_000_000) -> Bar:
-    return Bar(date=d, open=o, high=max(h, o, c), low=min(low_, o, c), close=c, volume=v)
-
-
-def _qualifying_bars() -> list[Bar]:
-    """220 all-pass-gate LONG bars (mirrors test_advise.py's baseline)."""
-    n = 220
-    start = date(2025, 1, 1)
-    closes = [400.0 + i * 0.8 for i in range(n)]
-    bars = [
-        _bar(start + timedelta(days=i), c - 0.1, c + 0.3, c - 0.4, c) for i, c in enumerate(closes)
-    ]
-    tail_start = n - 14
-    base = closes[tail_start - 1]
-    offsets = [0.5, 1.0, 4.0, 2.5, 1.0, 0.0, -1.5, -3.0, -3.8, -3.5, -3.0, -3.2, -2.8]
-    for j, off in enumerate(offsets):
-        idx = tail_start + j
-        c = base + off
-        bars[idx] = _bar(bars[idx].date, c - 0.15, c + 0.25, c - 0.3, c)
-    prev_high = bars[n - 2].high
-    final_close = prev_high + 0.5
-    bars[n - 1] = _bar(
-        bars[n - 1].date, prev_high + 0.1, final_close + 0.2, prev_high - 0.2,
-        final_close, 1_500_000,
-    )
-    return bars
-
-
 class _QualifyingProvider(MarketDataProvider):
     def daily_history(self, ticker: str, days: int) -> list[Bar]:
-        return _qualifying_bars()
+        return qualifying_bars()
 
     def spot(self, ticker: str) -> float:
-        return _qualifying_bars()[-1].close
+        return qualifying_bars()[-1].close
 
 
 @pytest.fixture
@@ -149,3 +122,54 @@ def test_analyze_without_open_exposure_flags_can_reach_a_trade_plan(
     result = runner.invoke(app, ["analyze", "SPY", "--offline", "--db", str(db_path)])
     assert result.exit_code == 0
     assert "NO TRADE" not in result.stdout.upper()
+
+
+# --- lone --open-positions/--open-risk-pct flag errors instead of silent drop ------
+
+
+def test_analyze_with_only_open_positions_errors(tmp_path: Path) -> None:
+    db_path = tmp_path / "advisor.sqlite"
+    result = runner.invoke(
+        app,
+        ["analyze", "SPY", "--offline", "--db", str(db_path), "--open-positions", "2"],
+    )
+    assert result.exit_code != 0
+    assert "--open-positions" in result.output
+    assert "--open-risk-pct" in result.output
+
+
+def test_analyze_with_only_open_risk_pct_errors(tmp_path: Path) -> None:
+    db_path = tmp_path / "advisor.sqlite"
+    result = runner.invoke(
+        app,
+        ["analyze", "SPY", "--offline", "--db", str(db_path), "--open-risk-pct", "0.01"],
+    )
+    assert result.exit_code != 0
+    assert "--open-positions" in result.output
+    assert "--open-risk-pct" in result.output
+
+
+# --- event note anchors to the analysis as_of, not wall-clock date.today() ---------
+
+
+def test_analyze_event_note_anchors_to_analysis_as_of(
+    tmp_path: Path, qualifying_provider: None, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A high-impact event just after the fixture's last bar date must surface a gap-risk
+    note, even though it is nowhere near wall-clock `date.today()` -- the note must be
+    anchored to the same `as_of` the trade plan itself was analysed against.
+    """
+    from advisor.analysis.events import EventCalendar, MacroEvent
+
+    last_bar_date = qualifying_bars()[-1].date
+    event_date = last_bar_date + timedelta(days=5)  # past blackout_days=2, within 14-day hold
+    calendar = EventCalendar(
+        last_updated=last_bar_date,
+        events=[MacroEvent(date=event_date, type="FOMC", impact="high", note="")],
+    )
+    monkeypatch.setattr(cli_module, "load_events", lambda: calendar)
+    db_path = tmp_path / "advisor.sqlite"
+    result = runner.invoke(app, ["analyze", "SPY", "--offline", "--db", str(db_path)])
+    assert result.exit_code == 0
+    assert "NO TRADE" not in result.stdout.upper()
+    assert "Gap risk" in result.stdout
