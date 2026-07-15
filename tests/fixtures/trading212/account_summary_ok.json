@@ -1,0 +1,10 @@
+{
+  "_comment": "SCHEMA VERIFIED against docs.trading212.com; VALUES synthetic — replace with a one-time captured demo payload before wiring.",
+  "totalValue": 12450.75,
+  "currency": "USD",
+  "cash": {
+    "availableToTrade": 3200.50,
+    "reservedForOrders": 150.00,
+    "inPies": 800.25
+  }
+}
