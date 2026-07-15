@@ -65,7 +65,12 @@ def _long_baseline_bars() -> list[Bar]:
     prev_high = bars[n - 2].high
     final_close = prev_high + 0.5
     bars[n - 1] = _bar(
-        bars[n - 1].date, prev_high + 0.1, final_close + 0.2, prev_high - 0.2, final_close, 1_500_000
+        bars[n - 1].date,
+        prev_high + 0.1,
+        final_close + 0.2,
+        prev_high - 0.2,
+        final_close,
+        1_500_000,
     )
     return bars
 
