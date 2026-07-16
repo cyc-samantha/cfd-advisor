@@ -10,10 +10,11 @@ jobs:
   lint-and-test:
     runs-on: ubuntu-latest
     env:
-      # setup-uv exports FORCE_COLOR=1 into the job env, which makes Typer's
-      # Rich-based error rendering wrap/split flag names (e.g. "--open-positions")
-      # across ANSI style codes, breaking plain-substring CLI assertions.
-      FORCE_COLOR: ""
+      # typer's rich_utils force-enables terminal/color mode whenever the
+      # GITHUB_ACTIONS env var is present, which wraps flag names (e.g.
+      # "--open-positions") in ANSI style codes and breaks the CLI tests'
+      # plain-substring assertions on error output.
+      _TYPER_FORCE_DISABLE_TERMINAL: "1"
     steps:
       - name: Checkout
         uses: actions/checkout@v4
