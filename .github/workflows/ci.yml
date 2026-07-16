@@ -9,6 +9,11 @@ on:
 jobs:
   lint-and-test:
     runs-on: ubuntu-latest
+    env:
+      # setup-uv exports FORCE_COLOR=1 into the job env, which makes Typer's
+      # Rich-based error rendering wrap/split flag names (e.g. "--open-positions")
+      # across ANSI style codes, breaking plain-substring CLI assertions.
+      FORCE_COLOR: ""
     steps:
       - name: Checkout
         uses: actions/checkout@v4
