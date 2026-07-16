@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
+import sys
 from dataclasses import dataclass
+from pathlib import Path
 
 import typer
 
@@ -27,6 +29,26 @@ app = typer.Typer(
     no_args_is_help=True,
     add_completion=False,
 )
+
+
+# A global interpreter, or someone else's venv, silently skips this
+# project's pinned dependency set (uv.lock) — behavior CI never verified.
+_NOT_IN_PROJECT_VENV_MSG = (
+    "advisor must run inside this project's own .venv (not a global "
+    "interpreter or any other virtualenv).\nUse `uv run advisor ...`."
+)
+
+
+def _project_venv() -> Path:
+    return Path(__file__).resolve().parents[2] / ".venv"
+
+
+@app.callback()
+def _ensure_venv() -> None:
+    """Refuse to run outside this project's own uv-managed .venv."""
+    if Path(sys.prefix).resolve() != _project_venv().resolve():
+        typer.echo(_NOT_IN_PROJECT_VENV_MSG, err=True)
+        raise typer.Exit(code=1)
 
 
 @app.command()

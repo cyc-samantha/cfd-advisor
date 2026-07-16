@@ -1,0 +1,30 @@
+# Normalize all text files to LF in the repository, on all platforms.
+# WHY: the working tree drifted to CRLF on a Windows checkout, producing
+# whole-file diffs with no real content change. Enforcing LF keeps diffs honest.
+* text=auto eol=lf
+
+# Explicit text types (defensive; already covered by the wildcard above).
+*.py    text eol=lf
+*.json  text eol=lf
+*.md    text eol=lf
+*.yaml  text eol=lf
+*.yml   text eol=lf
+*.csv   text eol=lf
+*.toml  text eol=lf
+*.lock  text eol=lf
+
+# Binary asset types: never touch line endings or attempt text diffs.
+# WHY: none are tracked today, but declaring them prevents future corruption.
+*.png   binary
+*.jpg   binary
+*.jpeg  binary
+*.gif   binary
+*.ico   binary
+*.pdf   binary
+*.zip   binary
+*.gz    binary
+*.db    binary
+*.sqlite binary
+*.woff  binary
+*.woff2 binary
+*.ttf   binary

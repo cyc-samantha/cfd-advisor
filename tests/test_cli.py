@@ -141,6 +141,30 @@ def test_analyze_with_explicit_flags_below_threshold_reaches_a_trade_plan(
     assert "NO TRADE" not in result.stdout.upper()
 
 
+# --- refuses to run outside this project's own .venv ---------------------------------
+
+
+def test_refuses_to_run_outside_project_venv(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(cli_module.sys, "prefix", "/usr", raising=False)
+    result = runner.invoke(app, ["journal"])
+    assert result.exit_code != 0
+    assert "uv run advisor" in result.output
+
+
+def test_refuses_to_run_in_some_other_venv(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    other_venv = tmp_path / "unrelated-venv"
+    other_venv.mkdir()
+    monkeypatch.setattr(cli_module.sys, "prefix", str(other_venv), raising=False)
+    result = runner.invoke(app, ["journal"])
+    assert result.exit_code != 0
+    assert "this project's own .venv" in result.output
+
+
+def test_allows_running_in_project_venv() -> None:
+    result = runner.invoke(app, ["journal"])
+    assert result.exit_code == 0
+
+
 # --- lone --open-positions/--open-risk-pct flag errors instead of silent drop ------
 
 
