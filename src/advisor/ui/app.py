@@ -66,10 +66,19 @@ def _render_chart_caption(target: str, latest: Bar) -> None:
     )
 
 
+@st.cache_data(ttl=300)
+def _cached_chart_bars(target: str, offline: bool) -> list[Bar]:
+    """Cached fetch so widget-only reruns don't re-hit yfinance for the same target.
+
+    A short TTL keeps "live" honest -- data goes stale for at most 5 minutes.
+    """
+    provider = build_provider(offline=offline)
+    return provider.daily_history(target, days=CHART_DAYS)
+
+
 def _fetch_chart_bars(target: str) -> list[Bar] | None:
-    provider = build_provider(offline=_is_offline())
     try:
-        return provider.daily_history(target, days=CHART_DAYS)
+        return _cached_chart_bars(target, _is_offline())
     except DataUnavailable as exc:
         st.warning(f"Chart unavailable for {target}: {exc.reason}")
         return None

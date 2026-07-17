@@ -1,6 +1,5 @@
 """Smoke tests for the Streamlit single-page UI (SPEC §4, §8 INV-5, Phase 3)."""
 
-import os
 from datetime import timedelta
 
 import pytest
@@ -8,13 +7,22 @@ from streamlit.testing.v1 import AppTest
 
 import advisor.datasource.base as ds_base
 from advisor.render import DISCLAIMER
+from advisor.ui.app import _cached_chart_bars
 from conftest import qualifying_bars
 
 APP_PATH = "src/advisor/ui/app.py"
 
 
+@pytest.fixture(autouse=True)
+def _offline_env(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Scope ADVISOR_OFFLINE to this test only -- the app now defaults to
+    live yfinance data, so a leaked "1" would silently offline later tests
+    while a leaked absence would send this suite over the network (INV-5)."""
+    monkeypatch.setenv("ADVISOR_OFFLINE", "1")
+    _cached_chart_bars.clear()
+
+
 def _offline_app() -> AppTest:
-    os.environ["ADVISOR_OFFLINE"] = "1"
     return AppTest.from_file(APP_PATH)
 
 
