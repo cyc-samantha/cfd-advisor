@@ -32,10 +32,15 @@ class _Inputs:
     capital: float
     open_positions: int
     open_risk_pct: float
+    calendar_check: bool
 
 
 def _advise_options(inputs: _Inputs) -> AdviseOptions:
-    return AdviseOptions(open_positions=inputs.open_positions, open_risk_pct=inputs.open_risk_pct)
+    return AdviseOptions(
+        open_positions=inputs.open_positions,
+        open_risk_pct=inputs.open_risk_pct,
+        calendar_check=inputs.calendar_check,
+    )
 
 
 def _run_advise(inputs: _Inputs, config: AppConfig, calendar: EventCalendar) -> AdviseResult:
@@ -50,7 +55,10 @@ def _run_advise(inputs: _Inputs, config: AppConfig, calendar: EventCalendar) -> 
 def _show_result(inputs: _Inputs, config: AppConfig, calendar: EventCalendar) -> None:
     result = _run_advise(inputs, config, calendar)
     is_trade = isinstance(result.plan, TradePlan)
-    event_note = holding_event_note(result.as_of, calendar.events) if is_trade else None
+    event_note = (
+        holding_event_note(result.as_of, calendar.events)
+        if is_trade and result.calendar_checked else None
+    )
     cfd_symbol = config.cfd_symbol_for(inputs.target)
     st.text(render_card(result.plan, cfd_symbol=cfd_symbol, event_note=event_note))
 
@@ -102,7 +110,12 @@ def _render_inputs(config: AppConfig) -> _Inputs:
     capital = st.number_input("Account capital (USD)", value=float(config.capital_default))
     open_positions = st.number_input("Open positions (INV-3)", min_value=0, value=0, step=1)
     open_risk_pct = st.number_input("Open risk % (INV-3)", min_value=0.0, value=0.0, step=0.1) / 100
-    return _Inputs(target, capital, open_positions, open_risk_pct)
+    calendar_check = st.checkbox(
+        "Check macro-event calendar",
+        value=True,
+        help="Disable to ignore stale-calendar and high-impact-event blackout vetoes.",
+    )
+    return _Inputs(target, capital, open_positions, open_risk_pct, calendar_check)
 
 
 def _render_page() -> None:

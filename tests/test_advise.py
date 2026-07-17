@@ -116,6 +116,29 @@ def test_advise_blackout_vetoes_even_when_signal_would_pass() -> None:
     assert row["kind"] == "no_trade"
 
 
+def test_advise_can_skip_calendar_blackout_when_explicitly_disabled() -> None:
+    bars = _long_baseline_bars()
+    result = advise(
+        "SPY",
+        provider=_FakeProvider(bars),
+        calendar=_blackout_calendar(bars[-1].date),
+        store=JournalStore(path=":memory:"),
+        config=CONFIG,
+        capital=CAPITAL,
+        options=AdviseOptions(
+            open_positions=0,
+            open_risk_pct=0.0,
+            calendar_check=False,
+        ),
+    )
+
+    assert isinstance(result.plan, TradePlan)
+    assert result.calendar_checked is False
+    event_gate_result = next(gate for gate in result.plan.gates if gate.name == "event clear")
+    assert event_gate_result.passed is True
+    assert event_gate_result.detail == "calendar check disabled"
+
+
 # --- clear conditions -> trade plan ----------------------------------------------
 
 

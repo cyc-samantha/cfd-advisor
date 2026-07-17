@@ -38,6 +38,7 @@ class AdviseOptions:
     open_positions: int | None = None
     open_risk_pct: float | None = None
     as_of: date_ | None = None
+    calendar_check: bool = True
 
 
 @dataclass(frozen=True)
@@ -51,6 +52,7 @@ class AdviseResult:
 
     plan: TradePlan | NoTrade
     as_of: date_
+    calendar_checked: bool
 
 
 @dataclass(frozen=True)
@@ -64,6 +66,7 @@ class _AdviseRequest:
     open_positions: int | None
     open_risk_pct: float | None
     as_of: date_ | None
+    calendar_check: bool
 
 
 # Analyse `target` and return a journaled TradePlan or NoTrade (INV-4), paired
@@ -90,7 +93,7 @@ def _build_request(
 ) -> _AdviseRequest:
     return _AdviseRequest(
         target, provider, calendar, store, config, capital,
-        options.open_positions, options.open_risk_pct, options.as_of,
+        options.open_positions, options.open_risk_pct, options.as_of, options.calendar_check,
     )
 
 
@@ -115,17 +118,20 @@ def _journal_no_trade(request: _AdviseRequest, cfd_symbol: str, error: str) -> A
     as_of = request.as_of or date_.today()
     no_trade = NoTrade(target=request.target, reason=f"data unavailable: {error}", gates=[])
     request.store.record(no_trade, as_of=as_of, cfd_symbol=cfd_symbol)
-    return AdviseResult(plan=no_trade, as_of=as_of)
+    return AdviseResult(plan=no_trade, as_of=as_of, calendar_checked=request.calendar_check)
 
 
 def _advise_with_bars(
     request: _AdviseRequest, bars: list[Bar], cfd_symbol: str
 ) -> AdviseResult:
     as_of = request.as_of or bars[-1].date
-    veto = _calendar_veto(request.calendar, as_of, request.config.blackout_days, request.target)
+    veto = (
+        _calendar_veto(request.calendar, as_of, request.config.blackout_days, request.target)
+        if request.calendar_check else None
+    )
     result = veto or _score_and_size(request, bars, as_of)
     request.store.record(result, as_of=as_of, cfd_symbol=cfd_symbol)
-    return AdviseResult(plan=result, as_of=as_of)
+    return AdviseResult(plan=result, as_of=as_of, calendar_checked=request.calendar_check)
 
 
 def _calendar_veto(
@@ -138,7 +144,11 @@ def _calendar_veto(
 
 
 def _score_and_size(request: _AdviseRequest, bars: list[Bar], as_of: date_) -> TradePlan | NoTrade:
-    gate = event_gate(as_of, request.calendar.events, request.config.blackout_days)
+    gate = (
+        event_gate(as_of, request.calendar.events, request.config.blackout_days)
+        if request.calendar_check
+        else GateResult(name="event clear", passed=True, detail="calendar check disabled")
+    )
     sig_config = SignalConfig(allow_short=request.config.allow_short)
     signal, failing_gates = _evaluate(bars, sig_config, gate)
     if signal is None:

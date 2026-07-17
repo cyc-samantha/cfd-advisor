@@ -56,6 +56,12 @@ def test_ui_shows_calendar_last_updated() -> None:
     assert "last updated" in rendered.lower()
 
 
+def test_ui_calendar_check_is_enabled_by_default() -> None:
+    at = _offline_app().run()
+    calendar_check = next(cb for cb in at.checkbox if "calendar" in cb.label.lower())
+    assert calendar_check.value is True
+
+
 def test_ui_target_dropdown_offers_all_four_targets() -> None:
     at = _offline_app().run()
     options = at.selectbox[0].options

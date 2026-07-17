@@ -66,21 +66,32 @@ def analyze(
     open_risk_pct: float = typer.Option(
         None, "--open-risk-pct", help="Currently open risk as a fraction of capital (INV-3)."
     ),
+    calendar_check: bool = typer.Option(
+        True,
+        "--calendar-check/--no-calendar-check",
+        help="Apply the stale-calendar and macro-event blackout checks.",
+    ),
 ) -> None:
     """Analyse a target and print a trade plan or no-trade card (INV-4: journals first)."""
     _validate_exposure_pair(open_positions, open_risk_pct)
     config = load_config()
     calendar = load_events()
-    args = _build_analyze_args(target, capital, offline, db, open_positions, open_risk_pct)
+    args = _build_analyze_args(
+        target, capital, offline, db, open_positions, open_risk_pct, calendar_check
+    )
     result = _run_advise(args, config, calendar)
     typer.echo(_render_result(result, config, calendar, target))
 
 
 def _build_analyze_args(
     target: str, capital: float, offline: bool, db: str,
-    open_positions: int | None, open_risk_pct: float | None,
+    open_positions: int | None, open_risk_pct: float | None, calendar_check: bool = True,
 ) -> _AnalyzeArgs:
-    options = AdviseOptions(open_positions=open_positions, open_risk_pct=open_risk_pct)
+    options = AdviseOptions(
+        open_positions=open_positions,
+        open_risk_pct=open_risk_pct,
+        calendar_check=calendar_check,
+    )
     return _AnalyzeArgs(target, capital, offline, db, options)
 
 
@@ -113,7 +124,10 @@ def _render_result(
     result: AdviseResult, config: AppConfig, calendar: EventCalendar, target: str
 ) -> str:
     is_trade = isinstance(result.plan, TradePlan)
-    event_note = holding_event_note(result.as_of, calendar.events) if is_trade else None
+    event_note = (
+        holding_event_note(result.as_of, calendar.events)
+        if is_trade and result.calendar_checked else None
+    )
     return render_card(result.plan, cfd_symbol=config.cfd_symbol_for(target), event_note=event_note)
 
 
