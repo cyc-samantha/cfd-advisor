@@ -65,7 +65,13 @@ def test_ui_calendar_check_is_enabled_by_default() -> None:
 def test_ui_target_dropdown_offers_all_four_targets() -> None:
     at = _offline_app().run()
     options = at.selectbox[0].options
-    assert set(options) == {"SPY", "QQQ", "GLD", "SLV"}
+    market_proxies = {"SPY", "QQQ", "GLD", "SLV"}
+    dow_30 = {
+        "MMM", "AXP", "AMGN", "AMZN", "AAPL", "BA", "CAT", "CVX", "CSCO", "KO",
+        "DIS", "GS", "HD", "HON", "IBM", "JNJ", "JPM", "MCD", "MRK", "MSFT",
+        "NKE", "NVDA", "PG", "CRM", "SHW", "TRV", "UNH", "VZ", "V", "WMT",
+    }
+    assert set(options) == market_proxies | dow_30
 
 
 # --- INV-3 reachable via real UI inputs (not just the internal override) ----------

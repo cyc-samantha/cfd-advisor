@@ -16,6 +16,39 @@ targets:
   - symbol: SLV
     cfd_symbol: Silver
     name: "Silver"
+  # Dow Jones Industrial Average constituents. Individual equities use the
+  # exchange ticker as the default execution symbol; adjust cfd_symbol here
+  # when the broker uses a different alias.
+  - {symbol: MMM,  cfd_symbol: MMM,  name: "3M"}
+  - {symbol: AXP,  cfd_symbol: AXP,  name: "American Express"}
+  - {symbol: AMGN, cfd_symbol: AMGN, name: "Amgen"}
+  - {symbol: AMZN, cfd_symbol: AMZN, name: "Amazon"}
+  - {symbol: AAPL, cfd_symbol: AAPL, name: "Apple"}
+  - {symbol: BA,   cfd_symbol: BA,   name: "Boeing"}
+  - {symbol: CAT,  cfd_symbol: CAT,  name: "Caterpillar"}
+  - {symbol: CVX,  cfd_symbol: CVX,  name: "Chevron"}
+  - {symbol: CSCO, cfd_symbol: CSCO, name: "Cisco"}
+  - {symbol: KO,   cfd_symbol: KO,   name: "Coca-Cola"}
+  - {symbol: DIS,  cfd_symbol: DIS,  name: "Walt Disney"}
+  - {symbol: GS,   cfd_symbol: GS,   name: "Goldman Sachs"}
+  - {symbol: HD,   cfd_symbol: HD,   name: "Home Depot"}
+  - {symbol: HON,  cfd_symbol: HON,  name: "Honeywell"}
+  - {symbol: IBM,  cfd_symbol: IBM,  name: "IBM"}
+  - {symbol: JNJ,  cfd_symbol: JNJ,  name: "Johnson & Johnson"}
+  - {symbol: JPM,  cfd_symbol: JPM,  name: "JPMorgan Chase"}
+  - {symbol: MCD,  cfd_symbol: MCD,  name: "McDonald's"}
+  - {symbol: MRK,  cfd_symbol: MRK,  name: "Merck"}
+  - {symbol: MSFT, cfd_symbol: MSFT, name: "Microsoft"}
+  - {symbol: NKE,  cfd_symbol: NKE,  name: "Nike"}
+  - {symbol: NVDA, cfd_symbol: NVDA, name: "Nvidia"}
+  - {symbol: PG,   cfd_symbol: PG,   name: "Procter & Gamble"}
+  - {symbol: CRM,  cfd_symbol: CRM,  name: "Salesforce"}
+  - {symbol: SHW,  cfd_symbol: SHW,  name: "Sherwin-Williams"}
+  - {symbol: TRV,  cfd_symbol: TRV,  name: "Travelers"}
+  - {symbol: UNH,  cfd_symbol: UNH,  name: "UnitedHealth Group"}
+  - {symbol: VZ,   cfd_symbol: VZ,   name: "Verizon"}
+  - {symbol: V,    cfd_symbol: V,    name: "Visa"}
+  - {symbol: WMT,  cfd_symbol: WMT,  name: "Walmart"}
 
 # Risk-first sizing (SPEC §2 A4). Position size is derived from the stop
 # distance so a stopped-out trade loses risk_pct of capital.
