@@ -1,6 +1,5 @@
 """Smoke tests for the Streamlit single-page UI (SPEC §4, §8 INV-5, Phase 3)."""
 
-import os
 from datetime import timedelta
 
 import pytest
@@ -8,13 +7,22 @@ from streamlit.testing.v1 import AppTest
 
 import advisor.datasource.base as ds_base
 from advisor.render import DISCLAIMER
+from advisor.ui.app import _cached_chart_bars
 from conftest import qualifying_bars
 
 APP_PATH = "src/advisor/ui/app.py"
 
 
+@pytest.fixture(autouse=True)
+def _offline_env(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Scope ADVISOR_OFFLINE to this test only -- the app now defaults to
+    live yfinance data, so a leaked "1" would silently offline later tests
+    while a leaked absence would send this suite over the network (INV-5)."""
+    monkeypatch.setenv("ADVISOR_OFFLINE", "1")
+    _cached_chart_bars.clear()
+
+
 def _offline_app() -> AppTest:
-    os.environ["ADVISOR_OFFLINE"] = "1"
     return AppTest.from_file(APP_PATH)
 
 
@@ -72,6 +80,43 @@ def test_ui_two_open_positions_forces_no_trade_on_analyze(qualifying_provider: N
     assert not at.exception
     assert "NO TRADE" in at.text[0].value.upper()
     assert "limit" in at.text[0].value
+
+
+# --- Live chart hookup (AC1-AC4) --------------------------------------------------
+
+
+def test_ui_renders_candlestick_chart_on_target_select() -> None:
+    at = _offline_app().run()
+    assert not at.exception
+    assert len(at.get("vega_lite_chart")) == 1
+
+
+def test_ui_chart_caption_shows_offline_fixture_source() -> None:
+    at = _offline_app().run()
+    rendered = "\n".join(caption.value for caption in at.caption)
+    assert "offline fixture (ADVISOR_OFFLINE=1)" in rendered
+
+
+def test_ui_chart_caption_shows_latest_close_and_date() -> None:
+    at = _offline_app().run()
+    rendered = "\n".join(caption.value for caption in at.caption)
+    from advisor.datasource.base import CsvFixtureProvider
+
+    latest = CsvFixtureProvider().daily_history("SPY", days=63)[-1]
+    assert f"{latest.close:.2f}" in rendered
+    assert latest.date.isoformat() in rendered
+
+
+def test_ui_chart_shows_data_unavailable_warning_not_stack_trace(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """QQQ has no offline fixture, so DataUnavailable is genuinely reachable."""
+    at = _offline_app().run()
+    target_select = at.selectbox[0]
+    target_select.set_value("QQQ").run()
+    assert not at.exception
+    assert len(at.warning) >= 1
+    assert "QQQ" in at.warning[0].value or "fixture" in at.warning[0].value.lower()
 
 
 def test_ui_analyze_event_note_anchors_to_analysis_as_of(

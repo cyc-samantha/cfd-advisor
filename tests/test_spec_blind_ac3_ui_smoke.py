@@ -13,10 +13,19 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import pytest
 from streamlit.testing.v1 import AppTest
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 APP_PATH = REPO_ROOT / "src" / "advisor" / "ui" / "app.py"
+
+
+def _offline_app_test(monkeypatch: pytest.MonkeyPatch) -> AppTest:
+    # INV-5: the UI now defaults to live yfinance data, so every AppTest
+    # here must force offline fixtures to keep this suite network-free.
+    # Scoped via monkeypatch so it doesn't leak into later tests.
+    monkeypatch.setenv("ADVISOR_OFFLINE", "1")
+    return AppTest.from_file(str(APP_PATH))
 
 
 def test_ui_app_file_exists_at_documented_location():
@@ -24,17 +33,17 @@ def test_ui_app_file_exists_at_documented_location():
     assert APP_PATH.is_file()
 
 
-def test_ui_app_imports_and_runs_without_raising():
-    at = AppTest.from_file(str(APP_PATH))
+def test_ui_app_imports_and_runs_without_raising(monkeypatch: pytest.MonkeyPatch):
+    at = _offline_app_test(monkeypatch)
     at.run(timeout=30)
 
     assert not at.exception, [str(e) for e in at.exception]
 
 
-def test_ui_app_renders_disclaimer_somewhere_on_the_page():
+def test_ui_app_renders_disclaimer_somewhere_on_the_page(monkeypatch: pytest.MonkeyPatch):
     """INV-6: every output carries the disclaimer -- the UI is an output
     surface too."""
-    at = AppTest.from_file(str(APP_PATH))
+    at = _offline_app_test(monkeypatch)
     at.run(timeout=30)
 
     assert not at.exception
