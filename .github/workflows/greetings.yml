@@ -13,7 +13,10 @@ jobs:
       issues: write
       pull-requests: write
     steps:
+      # WHY: greeting is best-effort; first-interaction is archived and its
+      # repo-wide contribution check intermittently 500s on GitHub's side.
       - uses: actions/first-interaction@v1
+        continue-on-error: true
         with:
           repo-token: ${{ secrets.GITHUB_TOKEN }}
           issue-message: >
