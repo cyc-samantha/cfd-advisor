@@ -17,9 +17,12 @@ def test_load_config_reads_repo_root_config_by_default() -> None:
     assert config.risk_pct == pytest.approx(0.01)
 
 
-def test_load_config_reads_all_four_targets() -> None:
+def test_load_config_reads_market_proxies_and_dow_30() -> None:
     config = load_config()
-    assert [t.symbol for t in config.targets] == ["SPY", "QQQ", "GLD", "SLV"]
+    symbols = [t.symbol for t in config.targets]
+    assert symbols[:4] == ["SPY", "QQQ", "GLD", "SLV"]
+    assert len(symbols) == 34
+    assert len(set(symbols)) == 34
     assert all(isinstance(t, Target) for t in config.targets)
 
 

@@ -1,8 +1,8 @@
 # Index CFD Trade Advisor ("Boring Moat")
 
 Analysis & suggestion tool for high-confidence, stop-loss-protected CFD trades on
-index ETFs/indices (SPY, QQQ, GLD, SLV). **No auto-trading** — the user executes
-manually in Trading212 by copying the numbers.
+the Dow 30 plus index and commodity proxies (SPY, QQQ, GLD, SLV). **No
+auto-trading** — the user executes manually in Trading212 by copying the numbers.
 
 See [SPEC.md](./SPEC.md) for the full specification. This project is built in
 phases (SPEC §9); this is the Phase 0 scaffold.
