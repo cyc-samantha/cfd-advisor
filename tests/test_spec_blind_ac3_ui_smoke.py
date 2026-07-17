@@ -11,6 +11,7 @@ run" smoke test, not a read of app.py's implementation.
 
 from __future__ import annotations
 
+import os
 from pathlib import Path
 
 from streamlit.testing.v1 import AppTest
@@ -19,13 +20,20 @@ REPO_ROOT = Path(__file__).resolve().parent.parent
 APP_PATH = REPO_ROOT / "src" / "advisor" / "ui" / "app.py"
 
 
+def _offline_app_test() -> AppTest:
+    # INV-5: the UI now defaults to live yfinance data, so every AppTest
+    # here must force offline fixtures to keep this suite network-free.
+    os.environ["ADVISOR_OFFLINE"] = "1"
+    return AppTest.from_file(str(APP_PATH))
+
+
 def test_ui_app_file_exists_at_documented_location():
     # SPEC.md SS3 and CLAUDE.md both document this exact path.
     assert APP_PATH.is_file()
 
 
 def test_ui_app_imports_and_runs_without_raising():
-    at = AppTest.from_file(str(APP_PATH))
+    at = _offline_app_test()
     at.run(timeout=30)
 
     assert not at.exception, [str(e) for e in at.exception]
@@ -34,7 +42,7 @@ def test_ui_app_imports_and_runs_without_raising():
 def test_ui_app_renders_disclaimer_somewhere_on_the_page():
     """INV-6: every output carries the disclaimer -- the UI is an output
     surface too."""
-    at = AppTest.from_file(str(APP_PATH))
+    at = _offline_app_test()
     at.run(timeout=30)
 
     assert not at.exception

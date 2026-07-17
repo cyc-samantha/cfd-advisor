@@ -74,6 +74,43 @@ def test_ui_two_open_positions_forces_no_trade_on_analyze(qualifying_provider: N
     assert "limit" in at.text[0].value
 
 
+# --- Live chart hookup (AC1-AC4) --------------------------------------------------
+
+
+def test_ui_renders_candlestick_chart_on_target_select() -> None:
+    at = _offline_app().run()
+    assert not at.exception
+    assert len(at.get("vega_lite_chart")) == 1
+
+
+def test_ui_chart_caption_shows_offline_fixture_source() -> None:
+    at = _offline_app().run()
+    rendered = "\n".join(caption.value for caption in at.caption)
+    assert "offline fixture (ADVISOR_OFFLINE=1)" in rendered
+
+
+def test_ui_chart_caption_shows_latest_close_and_date() -> None:
+    at = _offline_app().run()
+    rendered = "\n".join(caption.value for caption in at.caption)
+    from advisor.datasource.base import CsvFixtureProvider
+
+    latest = CsvFixtureProvider().daily_history("SPY", days=63)[-1]
+    assert f"{latest.close:.2f}" in rendered
+    assert latest.date.isoformat() in rendered
+
+
+def test_ui_chart_shows_data_unavailable_warning_not_stack_trace(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """QQQ has no offline fixture, so DataUnavailable is genuinely reachable."""
+    at = _offline_app().run()
+    target_select = at.selectbox[0]
+    target_select.set_value("QQQ").run()
+    assert not at.exception
+    assert len(at.warning) >= 1
+    assert "QQQ" in at.warning[0].value or "fixture" in at.warning[0].value.lower()
+
+
 def test_ui_analyze_event_note_anchors_to_analysis_as_of(
     qualifying_provider: None, monkeypatch: pytest.MonkeyPatch
 ) -> None:
