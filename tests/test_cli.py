@@ -61,6 +61,26 @@ def test_analyze_offline_journals_before_printing(tmp_path: Path) -> None:
     assert db_path.exists()
 
 
+def test_analyze_without_offline_flag_builds_provider_with_offline_false(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Bare `analyze` (neither --offline nor --no-offline given) must build
+    the provider with offline=False -- the CLI's live-by-default contract.
+    """
+    recorded: dict[str, bool] = {}
+
+    def _spy_build_provider(offline: bool) -> MarketDataProvider:
+        recorded["offline"] = offline
+        return _QualifyingProvider()
+
+    monkeypatch.setattr(cli_module, "build_provider", _spy_build_provider)
+    db_path = tmp_path / "advisor.sqlite"
+    result = runner.invoke(app, ["analyze", "SPY", "--db", str(db_path)])
+
+    assert result.exit_code == 0, result.output
+    assert recorded["offline"] is False
+
+
 def test_journal_empty_db_reports_no_suggestions(tmp_path: Path) -> None:
     db_path = tmp_path / "advisor.sqlite"
     result = runner.invoke(app, ["journal", "--db", str(db_path)])

@@ -31,7 +31,15 @@ QUALIFYING_CUTOFF = 325
 
 
 def run_cli(*args: str, timeout: int = 60) -> subprocess.CompletedProcess:
-    """Invoke the public `advisor` CLI entry point exactly as a user would."""
+    """Invoke the public `advisor` CLI entry point exactly as a user would.
+
+    WHY: `analyze` now defaults to live yfinance data, but these black-box
+    tests are keyed to the shipped/patched fixture CSVs (INV-5: no network
+    in tests) -- so every `analyze` invocation must force `--offline`
+    unless the caller already asked for a specific data source.
+    """
+    if "analyze" in args and "--offline" not in args and "--no-offline" not in args:
+        args = (*args, "--offline")
     return subprocess.run(
         ["uv", "run", "advisor", *args],
         cwd=REPO_ROOT,

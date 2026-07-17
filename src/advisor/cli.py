@@ -55,7 +55,10 @@ def _ensure_venv() -> None:
 def analyze(
     target: str = typer.Argument(..., help="Target symbol: SPY, QQQ, GLD, or SLV."),
     capital: float = typer.Option(10000, help="CFD account equity in USD."),
-    offline: bool = typer.Option(True, help="Use frozen fixture data instead of yfinance."),
+    offline: bool = typer.Option(
+        False,
+        help="Use frozen fixture data instead of live yfinance data. Defaults to live data.",
+    ),
     db: str = typer.Option("data/advisor.sqlite", help="Path to the journal SQLite database."),
     open_positions: int = typer.Option(
         None, "--open-positions", help="Currently open CFD positions (INV-3)."
