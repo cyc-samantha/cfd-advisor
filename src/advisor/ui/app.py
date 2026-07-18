@@ -12,6 +12,7 @@ import streamlit as st
 
 from advisor.advise import AdviseOptions, AdviseResult, advise, build_provider
 from advisor.analysis.events import EventCalendar, holding_event_note, load_events
+from advisor.analysis.indicators import IndicatorSnapshot, latest_snapshot
 from advisor.config import AppConfig, load_config
 from advisor.datasource.base import DataUnavailable
 from advisor.journal.store import JournalStore
@@ -20,6 +21,7 @@ from advisor.strategy.models import Bar, TradePlan
 from advisor.ui.chart import CHART_DAYS, candlestick_chart
 
 DB_PATH = "data/advisor.sqlite"
+ANALYSIS_DAYS = 260
 
 
 def _is_offline() -> bool:
@@ -100,6 +102,34 @@ def _render_chart(target: str) -> None:
     st.altair_chart(candlestick_chart(bars), width="stretch")
 
 
+@st.cache_data(ttl=300)
+def _cached_indicator_bars(target: str, offline: bool) -> list[Bar]:
+    provider = build_provider(offline=offline)
+    return provider.daily_history(target, days=ANALYSIS_DAYS)
+
+
+def _indicator_rows(snapshot: IndicatorSnapshot) -> list[dict[str, str]]:
+    return [
+        {"Indicator": "Close", "Value": f"{snapshot.close:.2f}"},
+        {"Indicator": "SMA 20", "Value": f"{snapshot.sma_20:.2f}"},
+        {"Indicator": "SMA 50", "Value": f"{snapshot.sma_50:.2f}"},
+        {"Indicator": "SMA 200", "Value": f"{snapshot.sma_200:.2f}"},
+        {"Indicator": "RSI 14", "Value": f"{snapshot.rsi_14:.2f}"},
+        {"Indicator": "ATR 14", "Value": f"{snapshot.atr_14:.3f}"},
+        {"Indicator": "Median ATR 100", "Value": f"{snapshot.median_atr_100:.3f}"},
+    ]
+
+
+def _render_indicators(target: str) -> None:
+    st.subheader("Current indicators")
+    try:
+        bars = _cached_indicator_bars(target, _is_offline())
+    except DataUnavailable as exc:
+        st.warning(f"Indicators unavailable for {target}: {exc.reason}")
+        return
+    st.dataframe(_indicator_rows(latest_snapshot(bars)), hide_index=True, width="stretch")
+
+
 def _render_footer(calendar: EventCalendar) -> None:
     st.caption(f"Calendar last updated: {calendar.last_updated.isoformat()}")
     st.caption(DISCLAIMER)
@@ -123,6 +153,7 @@ def _render_page() -> None:
     calendar = load_events()
     inputs = _render_inputs(config)
     _render_chart(inputs.target)
+    _render_indicators(inputs.target)
     if st.button("Analyze"):
         _show_result(inputs, config, calendar)
     _render_footer(calendar)

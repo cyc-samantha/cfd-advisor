@@ -7,7 +7,7 @@ from streamlit.testing.v1 import AppTest
 
 import advisor.datasource.base as ds_base
 from advisor.render import DISCLAIMER
-from advisor.ui.app import _cached_chart_bars
+from advisor.ui.app import _cached_chart_bars, _cached_indicator_bars
 from conftest import qualifying_bars
 
 APP_PATH = "src/advisor/ui/app.py"
@@ -20,6 +20,7 @@ def _offline_env(monkeypatch: pytest.MonkeyPatch) -> None:
     while a leaked absence would send this suite over the network (INV-5)."""
     monkeypatch.setenv("ADVISOR_OFFLINE", "1")
     _cached_chart_bars.clear()
+    _cached_indicator_bars.clear()
 
 
 def _offline_app() -> AppTest:
@@ -117,6 +118,17 @@ def test_ui_chart_caption_shows_latest_close_and_date() -> None:
     latest = CsvFixtureProvider().daily_history("SPY", days=63)[-1]
     assert f"{latest.close:.2f}" in rendered
     assert latest.date.isoformat() in rendered
+
+
+def test_ui_displays_strategy_indicators_for_selected_target() -> None:
+    at = _offline_app().run()
+    assert not at.exception
+    assert any("Current indicators" in heading.value for heading in at.subheader)
+    assert len(at.dataframe) == 1
+    frame = at.dataframe[0].value
+    assert set(frame["Indicator"]) == {
+        "Close", "SMA 20", "SMA 50", "SMA 200", "RSI 14", "ATR 14", "Median ATR 100"
+    }
 
 
 def test_ui_chart_shows_data_unavailable_warning_not_stack_trace(

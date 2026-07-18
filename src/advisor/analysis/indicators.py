@@ -9,8 +9,38 @@ the latest value.
 
 import math
 import statistics
+from dataclasses import dataclass
 
 from advisor.strategy.models import Bar
+
+
+@dataclass(frozen=True)
+class IndicatorSnapshot:
+    """Latest strategy indicators for one instrument."""
+
+    close: float
+    sma_20: float
+    sma_50: float
+    sma_200: float
+    rsi_14: float
+    atr_14: float
+    median_atr_100: float
+
+
+def latest_snapshot(bars: list[Bar]) -> IndicatorSnapshot:
+    """Calculate the latest values used by the confluence strategy."""
+    if len(bars) < 200:
+        raise ValueError(f"need at least 200 bars, got {len(bars)}")
+    closes = [bar.close for bar in bars]
+    return IndicatorSnapshot(
+        close=closes[-1],
+        sma_20=sma(closes, 20)[-1],
+        sma_50=sma(closes, 50)[-1],
+        sma_200=sma(closes, 200)[-1],
+        rsi_14=rsi(closes, 14)[-1],
+        atr_14=atr(bars, 14)[-1],
+        median_atr_100=atr_median(bars, 100),
+    )
 
 
 def sma(closes: list[float], n: int) -> list[float]:
